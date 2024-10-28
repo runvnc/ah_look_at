@@ -12,6 +12,9 @@ async def examine_image(full_image_path, context=None):
     { "examine_image": { "full_image_path": "/path/to/image.jpg" } }
 
     """
+    print("loading image")
     image = Image.open(full_image_path)
-    message = context.format_image_message(image)
+    print(image)
+    message = await context.format_image_message(image)
+    print("image message: ", message)
     return message

@@ -1,1 +1,1 @@
-from .mod import think
+from .mod import *
