@@ -5,6 +5,16 @@ import numpy as np
 from io import BytesIO
 import base64
 from PIL import Image
+import json
+
+async def write_debug_file(data):
+    page_num = 1
+    for page in data:
+        if 'type' in page:
+            with open(f"output/page_{page_num}_image_msg.json", "w") as f:
+                f.write(json.dumps(page))
+                print("Wrote image message to file: ", f.name)
+        page_num += 1
 
 async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_height=1568, max_pixels=1192464, context=None):
     """Generate a constrained overview image for each page in the PDF."""
@@ -89,6 +99,7 @@ async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_
         
         
     doc.close()
+    await write_debug_file(page_data)
     return page_data
 
 

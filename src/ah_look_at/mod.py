@@ -1,7 +1,7 @@
 from lib.providers.commands import command
 import base64
 from PIL import Image
-from pdf import pdf_to_images_and_text_impl
+from .pdf import pdf_to_images_and_text_impl
   
 @command()
 async def examine_image(full_image_path, context=None):
@@ -27,7 +27,7 @@ async def examine_pdf(pdf_path, context=None):
     Example:
     { "examine_pdf": { "pdf_path": "/absolute/path/to/pdf.pdf" } }
     """
-    w, y, pixels = await context.get_image_dimensions()
+    w, h, pixels = await context.get_image_dimensions()
     output_path = 'output'
-    out_list = await pdf_to_images_and_text_impl(pdf_path, output_path, max_width=w, max_height=h, max_pixels=pixels, context=None)
+    out_list = await pdf_to_images_and_text_impl(pdf_path, output_path, max_width=w, max_height=h, max_pixels=pixels, context=context)
     return out_list 
