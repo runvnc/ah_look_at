@@ -2,8 +2,11 @@ import fitz  # PyMuPDF
 import os
 import cv2
 import numpy as np
+from io import BytesIO
+import base64
+from PIL import Image
 
-def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_height=1568, max_pixels=1192464):
+async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_height=1568, max_pixels=1192464, context=None):
     """Generate a constrained overview image for each page in the PDF."""
     os.makedirs(output_dir, exist_ok=True)
     doc = fitz.open(pdf_path)
@@ -70,17 +73,21 @@ def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_height
         # Save the constrained overview image
         overview_filename = f"{output_dir}/page_{page_num + 1}_overview.png"
         cv2.imwrite(overview_filename, cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR))
-        
-        # Collect data for the overview image
+
         page_info = {
             "page_num": page_num + 1,
             "text": text,
-            "overview_image": overview_filename,
-            "overview_dimensions": (img_array.shape[1], img_array.shape[0]),
+            "image_filename": overview_filename,
+            "image_data": "in next message",
+            "dimensions": (img_array.shape[1], img_array.shape[0]),
             "dpi_used": dpi
         }
         page_data.append(page_info)
-
+        pil_image = Image.open(overview_filename)
+        formatted_image_message = await context.format_image_message(pil_image)
+        page_data.append(formatted_image_message)
+        
+        
     doc.close()
     return page_data
 
