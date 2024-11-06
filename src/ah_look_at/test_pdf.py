@@ -14,16 +14,17 @@ class TestVisionService:
         pass
 
     async def format_image_message(self, pil_image, context=None):
-        print("saving")
         buffer = BytesIO()
+        print('converting to base64')
         pil_image.save(buffer, format='PNG')
+        
         image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
- 
+        print('done')
         return {
             "type": "image",
             "source": {
                 "type": "base64",
-                "media_type": f"image/png",
+                "media_type": "image/png",
                 "data": image_base64
             }
         }
@@ -38,12 +39,14 @@ async def run_tests():
     overview_data = await pdf_to_images_and_text_impl(pdf_path, output_dir, context=service)
     page_num = 1
     for page in overview_data:
+        print("page_num", page_num)
         if 'type' in page:
-            with open(f"output/page_{page_num}_image_msg.json", "w") as f:
-                f.write(json.dumps(page))
-                print("Wrote image message to file: ", f.name)
+            pass
+            #with open(f"output/page_{page_num}_image_msg.json", "w") as f:
+            #    f.write(json.dumps(page))
+            #    print("Wrote image message to file: ", f.name)
         else:
-            print(f"Page {page_num} - Image file: {page['image_filename']}, Dimensions: {page['dimensions']}, DPI: {page['dpi_used']}")
+            print(f"Page {page_num}, Dimensions: {page['dimensions']}, DPI: {page['dpi_used']}")
             print(page['text'])
             page_num = page['page_num']
 
