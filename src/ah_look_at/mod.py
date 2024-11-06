@@ -37,7 +37,21 @@ async def get_pdf_stats(pdf_path, context=None):
 async def examine_pdf(pdf_path, start_page, end_page, render_page_images=True, context=None):
     """For each page of a PDF in start_page - end_page, extracts the text and images (if possible) and,
     if requested, renders the page as an image. 
+
+    In some cases, you may wish to check the number of pages with get_pdf_stats
+    before calling this command.
+    Also, you might investigate with render_page_images False first to find
+    relevant content before running with that parameter True to get the full images
+    of the relevant rendered pages.
+
     Example:
+    
+    { "examine_pdf": { "pdf_path": "/absolute/path/to/pdf.pdf",
+                       " start_page": 0, "end_page": 10,
+                       "render_page_images": False } }
+
+    or
+
     { "examine_pdf": { "pdf_path": "/absolute/path/to/pdf.pdf" } }
     """
     w, h, pixels = await context.get_image_dimensions()
