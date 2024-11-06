@@ -34,12 +34,13 @@ async def get_pdf_stats(pdf_path, context=None):
 
 
 @command()
-async def examine_pdf(pdf_path, start_page, end_page, render_page_images=True, context=None):
-    """For each page of a PDF in start_page - end_page, extracts the text and images (if possible) and,
-    if requested, renders the page as an image. 
+async def examine_pdf(pdf_path, start_page=None, end_page=None, render_page_images=True, context=None):
+    """For each page of a PDF in start_page - end_page (or all if not specified), 
+    extracts the text and images (if possible) and, if requested, renders the page as an image. 
 
     In some cases, you may wish to check the number of pages with get_pdf_stats
     before calling this command.
+
     Also, you might investigate with render_page_images False first to find
     relevant content before running with that parameter True to get the full images
     of the relevant rendered pages.
@@ -47,7 +48,7 @@ async def examine_pdf(pdf_path, start_page, end_page, render_page_images=True, c
     Example:
     
     { "examine_pdf": { "pdf_path": "/absolute/path/to/pdf.pdf",
-                       " start_page": 0, "end_page": 10,
+                       "start_page": 0, "end_page": 10,
                        "render_page_images": False } }
 
     or
@@ -56,6 +57,11 @@ async def examine_pdf(pdf_path, start_page, end_page, render_page_images=True, c
     """
     w, h, pixels = await context.get_image_dimensions()
     output_path = 'output'
+    if start_page is None:
+        start_page = 0
+    if end_page is None:
+        pdf = fitz.open(pdf_path)
+        end_page = pdf.page_count
     out_list = await pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_path, render_page_images, max_width=w, max_height=h, max_pixels=pixels, context=context)
     return out_list 
 
