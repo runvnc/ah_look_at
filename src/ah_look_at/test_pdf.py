@@ -1,12 +1,13 @@
-from pdf import pdf_to_images_and_text_impl, generate_zoomed_crop
+from pdf import pdf_to_images_and_text_impl 
 import asyncio
 from io import BytesIO
 import base64
 from PIL import Image
 import json
+import fitz
 
 # Usage example
-pdf_path = '/files/home/runvnc/3pages.pdf'  # Replace with your PDF file path
+pdf_path = '/files/dl/comps.pdf'  # Replace with your PDF file path
 output_dir = 'output'      # Replace with your desired output directory
 
 class TestVisionService:
@@ -34,9 +35,17 @@ class TestVisionService:
 
 service = TestVisionService()
 
-async def run_tests():
+async def get_pdf_stats(pdf_path, context=None):
+    pdf = fitz.open(pdf_path)
+    num_pages = pdf.page_count
+    metadata = pdf.metadata
+    return {"num_pages": num_pages, "metadata": metadata}
 
-    overview_data = await pdf_to_images_and_text_impl(pdf_path, output_dir, context=service)
+
+async def run_tests():
+    stats = await get_pdf_stats(pdf_path)
+    print(stats)
+    overview_data = await pdf_to_images_and_text_impl(pdf_path, 0, 87, output_dir, False, context=service)
     page_num = 1
     for page in overview_data:
         print("page_num", page_num)
@@ -46,7 +55,7 @@ async def run_tests():
             #    f.write(json.dumps(page))
             #    print("Wrote image message to file: ", f.name)
         else:
-            print(f"Page {page_num}, Dimensions: {page['dimensions']}, DPI: {page['dpi_used']}")
+            #print(f"Page {page_num}, Dimensions: {page['dimensions']}, DPI: {page['dpi_used']}")
             print(page['text'])
             page_num = page['page_num']
 

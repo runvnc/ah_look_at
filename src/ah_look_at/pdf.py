@@ -18,7 +18,60 @@ async def write_debug_file(data):
                 print("Wrote image message to file: ", f.name)
         page_num += 1
 
-async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_height=1568, max_pixels=1192464, context=None, debug=False):
+def extract_page_images(doc, page, output_dir, page_num):
+    """Extract all images from a PDF page and save to files.
+    
+    Args:
+        doc: fitz.Document - The PDF document
+        page: fitz.Page - The page to extract images from
+        output_dir: str - Directory to save images
+        page_num: int - Current page number (0-based)
+        
+    Returns:
+        list: List of dictionaries containing image info
+    """
+    images_dir = os.path.join(output_dir, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    
+    extracted_images = []
+    
+    # Get list of images on the page
+    image_list = page.get_images()
+    
+    for img_index, img_info in enumerate(image_list):
+        try:
+            xref = img_info[0]  # Get image reference number
+            base_image = doc.extract_image(xref)
+            
+            if base_image:
+                image_ext = base_image["ext"]  # Image extension (jpeg, png, etc)
+                image_bytes = base_image["image"]  # Image data
+                
+                # Create unique filename
+                filename = f"page_{page_num+1}_img_{img_index+1}.{image_ext}"
+                filepath = os.path.abspath(os.path.join(images_dir, filename))
+                
+                # Save image to file
+                with open(filepath, 'wb') as img_file:
+                    img_file.write(image_bytes)
+                
+                # Record image info
+                extracted_images.append({
+                    "filepath": filepath,
+                    "size": len(image_bytes),
+                    "type": image_ext,
+                    "width": base_image.get("width"),
+                    "height": base_image.get("height")
+                })
+                
+        except Exception as e:
+            print(f"Error extracting image {img_index} from page {page_num+1}: {e}")
+            continue
+            
+    return extracted_images
+
+
+async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir, render_page_images, max_width=1568, max_height=1568, max_pixels=1192464, context=None, debug=False):
     """Generate a constrained overview image for each page in the PDF.
     
     Args:
@@ -41,159 +94,165 @@ async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_
     doc = fitz.open(pdf_path)
     
     try:
-        for page_num in range(doc.page_count):
+        for page_num in range(start_page, end_page):
             start_time = time.time()
             page = doc[page_num]
             
-            # Extract text from the page
             text = page.get_text()
             
-            initial_zoom = 1  # 72 DPI
-            initial_pix = page.get_pixmap(matrix=fitz.Matrix(initial_zoom, initial_zoom))
-           
-            st_bounds = time.time()
-            try:
-                # Get content bounds from low-res version
-                img_array = np.frombuffer(initial_pix.samples, dtype=np.uint8).reshape(initial_pix.height, initial_pix.width, initial_pix.n)
-                # Convert to RGB only if needed
-                if initial_pix.n == 4:
-                    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
-                
-                # Convert to grayscale and find content bounds
-                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-                _, thresh = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY_INV)
-                coords = cv2.findNonZero(thresh)
-                
-                if coords is None:
-                    # No content found, use full page
-                    content_rect = page.rect
-                else:
-                    # Get exact bounds without margins
-                    x, y, w, h = cv2.boundingRect(coords)
-                    
-                    # Convert to PDF coordinates
-                    x_ratio = page.rect.width / initial_pix.width
-                    y_ratio = page.rect.height / initial_pix.height
-                    
-                    # Create content rect with exact bounds
-                    content_rect = fitz.Rect(
-                        page.rect.x0 + x * x_ratio,
-                        page.rect.y0 + y * y_ratio,
-                        page.rect.x0 + (x + w) * x_ratio,
-                        page.rect.y0 + (y + h) * y_ratio
-                    )
-            finally:
-                # Clean up initial pixmap
-                initial_pix = None
-                img_array = None
-                gray = None
-                thresh = None
+            extracted_images = extract_page_images(doc, page, output_dir, page_num)
+            img_array = None
+            dimensions = None
+            dpi = None
 
-            print("Elapsed time for bounds: ", (time.time() - st_bounds) * 1000)
-            st_zoom = time.time()
+            if render_page_images:
+
+                initial_zoom = 1  # 72 DPI
+                initial_pix = page.get_pixmap(matrix=fitz.Matrix(initial_zoom, initial_zoom))
             
-            # Get current content dimensions
-            content_width = content_rect.width
-            content_height = content_rect.height
-            current_dims = (content_width, content_height)
-            
-            # Check if dimensions match the previous page (within 1% tolerance)
-            if last_content_dims and last_zoom and last_dpi:
-                width_diff = abs(current_dims[0] - last_content_dims[0]) / last_content_dims[0]
-                height_diff = abs(current_dims[1] - last_content_dims[1]) / last_content_dims[1]
+                st_bounds = time.time()
+                try:
+                    # Get content bounds from low-res version
+                    img_array = np.frombuffer(initial_pix.samples, dtype=np.uint8).reshape(initial_pix.height, initial_pix.width, initial_pix.n)
+                    # Convert to RGB only if needed
+                    if initial_pix.n == 4:
+                        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
+                    
+                    # Convert to grayscale and find content bounds
+                    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+                    _, thresh = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY_INV)
+                    coords = cv2.findNonZero(thresh)
+                    
+                    if coords is None:
+                        # No content found, use full page
+                        content_rect = page.rect
+                    else:
+                        # Get exact bounds without margins
+                        x, y, w, h = cv2.boundingRect(coords)
+                        
+                        # Convert to PDF coordinates
+                        x_ratio = page.rect.width / initial_pix.width
+                        y_ratio = page.rect.height / initial_pix.height
+                        
+                        # Create content rect with exact bounds
+                        content_rect = fitz.Rect(
+                            page.rect.x0 + x * x_ratio,
+                            page.rect.y0 + y * y_ratio,
+                            page.rect.x0 + (x + w) * x_ratio,
+                            page.rect.y0 + (y + h) * y_ratio
+                        )
+                finally:
+                    # Clean up initial pixmap
+                    initial_pix = None
+                    img_array = None
+                    gray = None
+                    thresh = None
+
+                print("Elapsed time for bounds: ", (time.time() - st_bounds) * 1000)
+                st_zoom = time.time()
                 
-                if width_diff < 0.01 and height_diff < 0.01:
-                    # Reuse previous zoom values
-                    zoom = last_zoom
-                    dpi = last_dpi
-                    print("Reusing zoom values from previous page")
+                # Get current content dimensions
+                content_width = content_rect.width
+                content_height = content_rect.height
+                current_dims = (content_width, content_height)
+                
+                # Check if dimensions match the previous page (within 1% tolerance)
+                if last_content_dims and last_zoom and last_dpi:
+                    width_diff = abs(current_dims[0] - last_content_dims[0]) / last_content_dims[0]
+                    height_diff = abs(current_dims[1] - last_content_dims[1]) / last_content_dims[1]
+                    
+                    if width_diff < 0.01 and height_diff < 0.01:
+                        # Reuse previous zoom values
+                        zoom = last_zoom
+                        dpi = last_dpi
+                        print("Reusing zoom values from previous page")
+                    else:
+                        # Calculate new zoom values
+                        width_zoom = max_width / content_width
+                        height_zoom = max_height / content_height
+                        
+                        # Initial zoom estimation (take the minimum to satisfy both constraints)
+                        zoom = min(width_zoom, height_zoom)
+                        
+                        # Factor in max_pixels constraint
+                        pixels_zoom = math.sqrt(max_pixels / (content_width * content_height))
+                        zoom = min(zoom, pixels_zoom)
+                        
+                        # Convert to DPI and ensure it's within reasonable bounds
+                        dpi = min(max(72, zoom * 72), 360)  # Cap at 360 DPI
+                        zoom = dpi / 72
                 else:
-                    # Calculate new zoom values
+                    # First page, calculate zoom values
                     width_zoom = max_width / content_width
                     height_zoom = max_height / content_height
-                    
-                    # Initial zoom estimation (take the minimum to satisfy both constraints)
                     zoom = min(width_zoom, height_zoom)
-                    
-                    # Factor in max_pixels constraint
                     pixels_zoom = math.sqrt(max_pixels / (content_width * content_height))
                     zoom = min(zoom, pixels_zoom)
-                    
-                    # Convert to DPI and ensure it's within reasonable bounds
-                    dpi = min(max(72, zoom * 72), 360)  # Cap at 360 DPI
+                    dpi = min(max(72, zoom * 72), 360)
                     zoom = dpi / 72
-            else:
-                # First page, calculate zoom values
-                width_zoom = max_width / content_width
-                height_zoom = max_height / content_height
-                zoom = min(width_zoom, height_zoom)
-                pixels_zoom = math.sqrt(max_pixels / (content_width * content_height))
-                zoom = min(zoom, pixels_zoom)
-                dpi = min(max(72, zoom * 72), 360)
-                zoom = dpi / 72
-            
-            # Create final pixmap with calculated zoom
-            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=content_rect)
-            
-            # Verify constraints and adjust if needed
-            if pix.width * pix.height > max_pixels or zoom >= 5:
-                zoom = zoom * 0.8  # Reduce by 20% if still too large
-                dpi = zoom * 72
+                
+                # Create final pixmap with calculated zoom
                 pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=content_rect)
+                
+                # Verify constraints and adjust if needed
+                if pix.width * pix.height > max_pixels or zoom >= 5:
+                    zoom = zoom * 0.8  # Reduce by 20% if still too large
+                    dpi = zoom * 72
+                    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=content_rect)
+                
+                print("DPI: ", dpi)
+                # Cache the values for next page
+                last_content_dims = current_dims
+                last_zoom = zoom
+                last_dpi = dpi
+                
+                print("Elapsed time for zoom: ", (time.time() - st_zoom) * 1000)
+                st_encode = time.time()
+                try:
+                    img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                    
+                    if pix.n == 4:
+                        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
+                    
+                    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                    
+                    _, encoded_img = cv2.imencode('.png', img_bgr, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+                    
+                    reusable_buffer.seek(0)
+                    reusable_buffer.truncate(0)
+                    reusable_buffer.write(encoded_img.tobytes())
+                    reusable_buffer.seek(0)
+                
+                    pil_image = Image.open(reusable_buffer)
+                
+                    with open(f"output/page_{page_num}_image.png", "wb") as f:
+                        f.write(encoded_img)
+                        print("Wrote image to file: ", f.name)
+
+                finally:
+                    pix = None
+                    img_bgr = None
+                        
+            page_info = {
+                "page_num": page_num + 1,
+                "text": text,
+                "dpi_used": dpi,
+                "extracted_images": extracted_images
+            }
+            if render_page_images:
+                page_info["dimensions"] = (img_array.shape[1], img_array.shape[0])
+                page_info["image_data"] = 'in next message'
+
+            page_data.append(page_info)
             
-            # Cache the values for next page
-            last_content_dims = current_dims
-            last_zoom = zoom
-            last_dpi = dpi
-            
-            print("Elapsed time for zoom: ", (time.time() - st_zoom) * 1000)
-            st_encode = time.time()
-            try:
-                # Convert pixmap to image array efficiently
-                img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
-                
-                # Single color conversion if needed
-                if pix.n == 4:
-                    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
-                
-                # Convert to BGR for cv2 encoding
-                img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-                
-                # Encode to PNG using cv2 with fast compression
-                _, encoded_img = cv2.imencode('.png', img_bgr, [cv2.IMWRITE_PNG_COMPRESSION, 1])
-                
-                # Reuse BytesIO buffer
-                reusable_buffer.seek(0)
-                reusable_buffer.truncate(0)
-                reusable_buffer.write(encoded_img.tobytes())
-                reusable_buffer.seek(0)
-                
-                # Create PIL Image for format_image_message
-                pil_image = Image.open(reusable_buffer)
-                
-                page_info = {
-                    "page_num": page_num + 1,
-                    "text": text,
-                    "image_data": "in next message",
-                    "dimensions": (img_array.shape[1], img_array.shape[0]),
-                    "dpi_used": dpi
-                }
-                page_data.append(page_info)
-                
-                # Format image message
+            if render_page_images:
                 formatted_image_message = await context.format_image_message(pil_image)
                 page_data.append(formatted_image_message)
                 
-                print("Encode tiempo: ", (time.time() - st_encode) * 1000)
+                print("Encode time: ", (time.time() - st_encode) * 1000)
             
-            finally:
-                # Clean up resources
-                pix = None
-                img_array = None
-                img_bgr = None
-                pil_image = None
-            
-            print("Elapsed time for encode: ", (time.time() - st_encode) * 1000)
+            img_array = None
+            pil_image = None
             print("Elapsed time: ", (time.time() - start_time) * 1000)
 
     finally:
@@ -204,78 +263,3 @@ async def pdf_to_images_and_text_impl(pdf_path, output_dir, max_width=1568, max_
     if debug:
         await write_debug_file(page_data)
     return page_data
-
-
-def generate_zoomed_crop(pdf_path, output_dir, page_num, upper_left, lower_right, dpi=300):
-    """Generate a high-DPI zoomed crop of a specified area on a given page."""
-    os.makedirs(output_dir, exist_ok=True)
-    doc = fitz.open(pdf_path)
-    
-    try:
-        # Select the page and define initial crop area
-        page = doc[page_num - 1]  # Zero-based index
-        initial_crop_rect = fitz.Rect(upper_left, lower_right)
-        
-        # Get initial low-res pixmap for smart crop calculation
-        initial_zoom = 1  # 72 DPI
-        initial_pix = page.get_pixmap(matrix=fitz.Matrix(initial_zoom, initial_zoom), clip=initial_crop_rect)
-        
-        try:
-            # Get content bounds from low-res version
-            img_array = np.frombuffer(initial_pix.samples, dtype=np.uint8).reshape(initial_pix.height, initial_pix.width, initial_pix.n)
-            if initial_pix.n == 4:
-                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
-            
-            # Convert to grayscale and find content bounds
-            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-            _, thresh = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY_INV)
-            coords = cv2.findNonZero(thresh)
-            
-            if coords is None:
-                # No content found, use full crop area
-                final_crop_rect = initial_crop_rect
-            else:
-                # Get exact bounds without margins
-                x, y, w, h = cv2.boundingRect(coords)
-                
-                # Convert to PDF coordinates within the initial crop area
-                x_ratio = initial_crop_rect.width / initial_pix.width
-                y_ratio = initial_crop_rect.height / initial_pix.height
-                
-                # Create content rect with exact bounds
-                final_crop_rect = fitz.Rect(
-                    initial_crop_rect.x0 + x * x_ratio,
-                    initial_crop_rect.y0 + y * y_ratio,
-                    initial_crop_rect.x0 + (x + w) * x_ratio,
-                    initial_crop_rect.y0 + (y + h) * y_ratio
-                )
-        finally:
-            # Clean up resources
-            initial_pix = None
-            img_array = None
-            gray = None
-            thresh = None
-        
-        # Apply high-DPI scaling for detailed rendering
-        matrix = fitz.Matrix(dpi / 72, dpi / 72)
-        pix = page.get_pixmap(matrix=matrix, clip=final_crop_rect)
-        
-        try:
-            # Convert final pixmap to image
-            img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
-            if pix.n == 4:
-                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
-            
-            # Save the zoomed crop
-            zoomed_filename = f"{output_dir}/page_{page_num}_zoomed_crop.png"
-            cv2.imwrite(zoomed_filename, cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR))
-            
-            return zoomed_filename
-        finally:
-            # Clean up resources
-            pix = None
-            img_array = None
-            
-    finally:
-        # Ensure document is closed
-        doc.close()
