@@ -56,13 +56,14 @@ async def examine_pdf(pdf_path, start_page=None, end_page=None, render_page_imag
     { "examine_pdf": { "pdf_path": "/absolute/path/to/pdf.pdf" } }
     """
     w, h, pixels = await context.get_image_dimensions()
-    output_path = 'output'
+    pdf_dir = '/'.join(pdf_path.split('/')[:-1])
+
     if start_page is None:
         start_page = 0
     if end_page is None:
         pdf = fitz.open(pdf_path)
         end_page = pdf.page_count
-    out_list = await pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_path, render_page_images, max_width=w, max_height=h, max_pixels=pixels, context=context)
+    out_list = await pdf_to_images_and_text_impl(pdf_path, start_page, end_page, pdf_dir, render_page_images, max_width=w, max_height=h, max_pixels=pixels, context=context)
     return out_list 
 
 

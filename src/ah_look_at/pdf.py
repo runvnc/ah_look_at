@@ -30,7 +30,8 @@ def extract_page_images(doc, page, output_dir, page_num):
     Returns:
         list: List of dictionaries containing image info
     """
-    images_dir = os.path.join(output_dir, "images")
+    #images_dir = os.path.join(output_dir, "images")
+    images_dir = output_dir
     os.makedirs(images_dir, exist_ok=True)
     
     extracted_images = []
