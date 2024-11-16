@@ -78,6 +78,8 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     Args:
         pdf_path: Path to the PDF file
         output_dir: Directory to save output files
+        start_page: First page to process (0-based)
+        end_page: Last page to process (0-based)
         max_width: Maximum width constraint for output images
         max_height: Maximum height constraint for output images
         max_pixels: Maximum total pixels constraint
@@ -95,7 +97,7 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     doc = fitz.open(pdf_path)
     
     try:
-        for page_num in range(start_page, end_page):
+        for page_num in range(start_page, end_page+1):
             start_time = time.time()
             page = doc[page_num]
             
