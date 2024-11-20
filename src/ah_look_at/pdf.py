@@ -48,8 +48,13 @@ def extract_page_images(doc, page, output_dir, page_num):
                 image_ext = base_image["ext"]  # Image extension (jpeg, png, etc)
                 image_bytes = base_image["image"]  # Image data
                 
-                # Create unique filename
-                filename = f"page_{page_num+1}_img_{img_index+1}.{image_ext}"
+                #filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}.{image_ext}"
+
+                img_name = img_info[7] if len(img_info) > 7 else 'unnamed'
+                colorspace = base_image.get('colorspace', 'unknown')
+                filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}_{colorspace}_{img_name}.{image_ext}"
+                filename = ''.join(c for c in filename if c.isalnum() or c in '._-')
+
                 filepath = os.path.abspath(os.path.join(images_dir, filename))
                 
                 # Save image to file
