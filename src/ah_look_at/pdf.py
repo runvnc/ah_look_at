@@ -51,7 +51,8 @@ def extract_page_images(doc, page, output_dir, page_num):
                 #filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}.{image_ext}"
 
                 img_name = img_info[7] if len(img_info) > 7 else 'unnamed'
-                colorspace = base_image.get('colorspace', 'unknown')
+                colorspace = img_info[5]
+                #colorspace = base_image.get('colorspace', 'unknown')
                 filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}_{colorspace}_{img_name}.{image_ext}"
                 filename = ''.join(c for c in filename if c.isalnum() or c in '._-')
 
@@ -66,6 +67,7 @@ def extract_page_images(doc, page, output_dir, page_num):
                     "filepath": filepath,
                     "size": len(image_bytes),
                     "type": image_ext,
+                    "colorspace": colorspace,
                     "width": base_image.get("width"),
                     "height": base_image.get("height")
                 })

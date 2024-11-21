@@ -7,8 +7,8 @@ import json
 import fitz
 
 # Usage example
-#pdf_path = '/files/dl/comps.pdf'  # Replace with your PDF file path
-pdf_path = '/files/dl/12pratt.pdf'  # Replace with your PDF file path
+pdf_path = '/files/dl/comps.pdf'  # Replace with your PDF file path
+#pdf_path = '/files/dl/12pratt.pdf'  # Replace with your PDF file path
 
 output_dir = 'output'      # Replace with your desired output directory
 
@@ -47,7 +47,7 @@ async def get_pdf_stats(pdf_path, context=None):
 async def run_tests():
     stats = await get_pdf_stats(pdf_path)
     print(stats)
-    overview_data = await pdf_to_images_and_text_impl(pdf_path, 3, 4, output_dir, True, context=service)
+    overview_data = await pdf_to_images_and_text_impl(pdf_path, 1, 6, output_dir, True, context=service)
     print(overview_data)
     page_num = 1
     for page in overview_data:
