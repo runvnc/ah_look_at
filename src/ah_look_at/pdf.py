@@ -104,7 +104,9 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     doc = fitz.open(pdf_path)
     
     try:
-        for page_num in range(start_page, end_page+1):
+        if start_page == end_endpage:
+            end_page += 1
+        for page_num in range(start_page, end_page):
             start_time = time.time()
             page = doc[page_num]
             
