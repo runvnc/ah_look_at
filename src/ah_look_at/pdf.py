@@ -8,6 +8,7 @@ import base64
 from PIL import Image
 import json
 import time
+import traceback
 
 async def write_debug_file(data):
     page_num = 1
@@ -73,7 +74,8 @@ def extract_page_images(doc, page, output_dir, page_num):
                 })
                 
         except Exception as e:
-            print(f"Error extracting image {img_index} from page {page_num+1}: {e}")
+            trace = traceback.format_exc()
+            print(f"Error extracting image {img_index} from page {page_num+1}: {e}\n{trace}")
             continue
             
     return extracted_images
