@@ -239,7 +239,7 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
                 
                     pil_image = Image.open(reusable_buffer)
                 
-                    with open(f"output/page_{page_num}_image.png", "wb") as f:
+                    with open(f"{output_dir}/page_{page_num}_image.png", "wb") as f:
                         f.write(encoded_img)
                         print("Wrote image to file: ", f.name)
 
