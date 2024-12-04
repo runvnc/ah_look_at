@@ -8,6 +8,7 @@ import base64
 from PIL import Image
 import json
 import time
+import traceback
 
 async def write_debug_file(data):
     page_num = 1
@@ -48,8 +49,14 @@ def extract_page_images(doc, page, output_dir, page_num):
                 image_ext = base_image["ext"]  # Image extension (jpeg, png, etc)
                 image_bytes = base_image["image"]  # Image data
                 
-                # Create unique filename
-                filename = f"page_{page_num+1}_img_{img_index+1}.{image_ext}"
+                #filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}.{image_ext}"
+
+                img_name = img_info[7] if len(img_info) > 7 else 'unnamed'
+                colorspace = img_info[5]
+                #colorspace = base_image.get('colorspace', 'unknown')
+                filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}_{colorspace}_{img_name}.{image_ext}"
+                filename = ''.join(c for c in filename if c.isalnum() or c in '._-')
+
                 filepath = os.path.abspath(os.path.join(images_dir, filename))
                 
                 # Save image to file
@@ -61,12 +68,14 @@ def extract_page_images(doc, page, output_dir, page_num):
                     "filepath": filepath,
                     "size": len(image_bytes),
                     "type": image_ext,
+                    "colorspace": colorspace,
                     "width": base_image.get("width"),
                     "height": base_image.get("height")
                 })
                 
         except Exception as e:
-            print(f"Error extracting image {img_index} from page {page_num+1}: {e}")
+            trace = traceback.format_exc()
+            print(f"Error extracting image {img_index} from page {page_num+1}: {e}\n{trace}")
             continue
             
     return extracted_images
@@ -78,6 +87,8 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     Args:
         pdf_path: Path to the PDF file
         output_dir: Directory to save output files
+        start_page: First page to process (0-based)
+        end_page: Last page to process (0-based)
         max_width: Maximum width constraint for output images
         max_height: Maximum height constraint for output images
         max_pixels: Maximum total pixels constraint
@@ -95,6 +106,8 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     doc = fitz.open(pdf_path)
     
     try:
+        if start_page == end_page:
+            end_page += 1
         for page_num in range(start_page, end_page):
             start_time = time.time()
             page = doc[page_num]
@@ -226,7 +239,7 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
                 
                     pil_image = Image.open(reusable_buffer)
                 
-                    with open(f"output/page_{page_num}_image.png", "wb") as f:
+                    with open(f"{output_dir}/page_{page_num}_image.png", "wb") as f:
                         f.write(encoded_img)
                         print("Wrote image to file: ", f.name)
 
