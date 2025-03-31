@@ -30,6 +30,10 @@ async def examine_image(full_image_path, context=None):
 async def chat_ocr(image_path, prompt="Extract the text from the image", context=None):
     try:
         img_content = await examine_image(image_path, context)
+        if context.agent is None:
+            context.agent = "system"
+        if context.user is None:
+            context.user = "system"
         message = { "role": "user", "content": [img_content, { "text": prompt, "type": "text" } ]}
         model = os.environ.get("MR_OCR_VLM", None)
         stream = await context.stream_chat(model, messages=[message], context=context)
