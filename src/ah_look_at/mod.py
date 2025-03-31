@@ -22,7 +22,7 @@ async def examine_image(full_image_path, context=None):
     image = Image.open(full_image_path)
     print(image)
     message = await context.format_image_message(image)
-    print("image message: ", message)
+    print("image message len: ", len(message))
     return message
 
 
@@ -33,6 +33,7 @@ async def chat_ocr(image_path, prompt="Extract the text from the image", context
 
         message = { "role": "user", "content": [img_content, { "text": prompt, "type": "text" } ]}
         model = os.environ.get("MR_OCR_VLM", None)
+        print("Starting chat stream for ocr with model: ", model)
         stream = await context.stream_chat(model, messages=[message], context=context)
         full_text = ""
         async for text_chunk in stream:
