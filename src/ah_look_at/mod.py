@@ -5,6 +5,8 @@ from PIL import Image
 from .pdf import pdf_to_images_and_text_impl
 import fitz  # PyMuPDF
 import traceback
+import os
+
 
 @command()
 async def examine_image(full_image_path, context=None):
