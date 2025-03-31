@@ -42,8 +42,9 @@ async def chat_ocr(image_path, prompt="Extract the text from the image", context
             full_text += text_chunk
         return full_text
     except Exception as e:
-        print(f"Error in chat_ocr: {str(e)}")
-        return "Error: " + str(e)
+        trace = traceback.format_exc()
+        print(f"Error in chat_ocr: {str(e)} {trace}")
+        return "Error: " + str(e) + "\n" + trace
 
 
 @command()
