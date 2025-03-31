@@ -27,7 +27,7 @@ async def examine_image(full_image_path, context=None):
 
 
 @service()
-async def chat_ocr(image_path, prompt="Act as an OCR program: extract the text from the image and output ONLY the text from the image in your response", context=None):
+async def chat_ocr(image_path, prompt="Act as an advanced layout-aware OCR program: extract the text as markdown in semantic order from the image and output ONLY the text from the image in your response", context=None):
     try:
         img_content = await examine_image(image_path, context)
 
