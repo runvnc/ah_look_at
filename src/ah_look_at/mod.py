@@ -1,4 +1,5 @@
 from lib.providers.commands import command
+from lib.providers.services import service
 import base64
 from PIL import Image
 from .pdf import pdf_to_images_and_text_impl
@@ -21,6 +22,21 @@ async def examine_image(full_image_path, context=None):
     message = await context.format_image_message(image)
     print("image message: ", message)
     return message
+
+
+@service()
+async def chat_ocr(image_path, prompt="Extract the text from the image", context=None):
+    try:
+        img_content = await examine_image(image_path, context)
+        message = { "role": "user", "content": [img_content, { "text": prompt, "type": "text" } ]}
+        stream = await context.stream_chat(None, messages=[message, context=context)
+        full_text = ""
+        async for text_chunk in stream:
+            full_text += text_chunk
+        return full_text
+    except Exception as e:
+        print(f"Error in chat_ocr: {str(e)}")
+        return "Error: " + str(e)
 
 
 @command()

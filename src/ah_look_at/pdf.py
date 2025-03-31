@@ -9,6 +9,8 @@ from PIL import Image
 import json
 import time
 import traceback
+from lib.utils.debug import debug_box
+
 
 async def write_debug_file(data):
     page_num = 1
@@ -35,10 +37,12 @@ def extract_page_images(doc, page, output_dir, page_num):
     images_dir = output_dir
     os.makedirs(images_dir, exist_ok=True)
     
+    debug_box("Extracting page images..")
     extracted_images = []
     
     # Get list of images on the page
     image_list = page.get_images()
+    print(f"Found {len(image_list)} in page")
     
     for img_index, img_info in enumerate(image_list):
         try:
