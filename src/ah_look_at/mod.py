@@ -37,7 +37,7 @@ async def chat_ocr(image_path, prompt="Extract the text from the image", context
         stream = await context.stream_chat(model, messages=[message], context=context)
         full_text = ""
         async for text_chunk in stream:
-            print(text, end="")
+            print(text_chunk, end="")
             full_text += text_chunk
         return full_text
     except Exception as e:
