@@ -31,8 +31,23 @@ ocr_prompt ="""Act as an advanced layout-aware OCR program:
    - output ONLY the text from the image in your response
    - do NOT put your output in a markdown code block, just raw markdown throughout""" 
 
+@command()
 @service()
 async def chat_ocr(image_path, prompt=ocr_prompt, context=None):
+    f"""
+    Example:
+    {{ "chat_ocr": {{ "image_path": "/absolute/path/to/file.png" }} }}
+
+    Example (with optional prompt):
+    (Note, the default prompt is shown)
+
+    {{ "chat_ocr": {{ "image_path": "/absolute/path/to/file.png", "prompt": START_RAW
+    {ocr_prompt}
+
+    END_RAW
+     }} }}
+    
+    """
     try:
         img_content = await examine_image(image_path, context)
 
@@ -49,6 +64,7 @@ async def chat_ocr(image_path, prompt=ocr_prompt, context=None):
         trace = traceback.format_exc()
         print(f"Error in chat_ocr: {str(e)} {trace}")
         return "Error: " + str(e) + "\n" + trace
+
 
 
 @command()
