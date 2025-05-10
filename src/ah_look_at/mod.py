@@ -32,7 +32,7 @@ ocr_prompt ="""Act as an advanced layout-aware OCR program:
    - do NOT put your output in a markdown code block, just raw markdown throughout""" 
 
 @service()
-async def chat_ocr(image_path, prompt=ocr_prompt, context=None):
+async def chat_ocr(model=None, image_path, prompt=ocr_prompt, context=None):
     """
     OCR or other text output from VLM inspecting an image.    
     """
@@ -40,7 +40,8 @@ async def chat_ocr(image_path, prompt=ocr_prompt, context=None):
         img_content = await examine_image(image_path, context)
 
         message = { "role": "user", "content": [img_content, { "text": prompt, "type": "text" } ]}
-        model = os.environ.get("MR_OCR_VLM", None)
+        if model is None:
+            model = os.environ.get("MR_OCR_VLM", None)
         print("Starting chat stream for ocr with model: ", model)
         stream = await context.stream_chat(model, messages=[message], context=context)
         full_text = ""
