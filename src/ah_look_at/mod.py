@@ -32,7 +32,7 @@ ocr_prompt ="""Act as an advanced layout-aware OCR program:
    - do NOT put your output in a markdown code block, just raw markdown throughout""" 
 
 @service()
-async def chat_ocr(model=None, image_path, prompt=ocr_prompt, context=None):
+async def chat_ocr(model, image_path, prompt=ocr_prompt, context=None):
     """
     OCR or other text output from VLM inspecting an image.    
     """
