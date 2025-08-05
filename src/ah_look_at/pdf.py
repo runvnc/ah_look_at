@@ -1,5 +1,6 @@
 import fitz  # PyMuPDF
 import math
+import hashlib
 import cv2
 import os
 import numpy as np
@@ -20,8 +21,9 @@ async def write_debug_file(data):
                 f.write(json.dumps(page))
                 print("Wrote image message to file: ", f.name)
         page_num += 1
+    return page_data
 
-def extract_page_images(doc, page, output_dir, page_num):
+def extract_page_images(doc, page, output_dir, page_num, image_cache=None):
     """Extract all images from a PDF page and save to files.
     
     Args:
@@ -29,16 +31,21 @@ def extract_page_images(doc, page, output_dir, page_num):
         page: fitz.Page - The page to extract images from
         output_dir: str - Directory to save images
         page_num: int - Current page number (0-based)
+        image_cache: dict - Cache for tracking duplicate images across pages
         
     Returns:
         list: List of dictionaries containing image info
     """
-    #images_dir = os.path.join(output_dir, "images")
+    # images_dir = os.path.join(output_dir, "images")
     images_dir = output_dir
     os.makedirs(images_dir, exist_ok=True)
     
     debug_box("Extracting page images..")
     extracted_images = []
+    
+    # Initialize image_cache if not provided
+    if image_cache is None:
+        image_cache = {}
     
     # Get list of images on the page
     image_list = page.get_images()
@@ -46,12 +53,17 @@ def extract_page_images(doc, page, output_dir, page_num):
     
     for img_index, img_info in enumerate(image_list):
         try:
+            start_time = time.time()
+            
             xref = img_info[0]  # Get image reference number
             base_image = doc.extract_image(xref)
             
             if base_image:
                 image_ext = base_image["ext"]  # Image extension (jpeg, png, etc)
                 image_bytes = base_image["image"]  # Image data
+                
+                # Calculate hash of image bytes for efficient duplicate detection
+                image_hash = hashlib.sha256(image_bytes).hexdigest()
                 
                 #filename = f"page_{page_num+1}_img_{img_index+1}_{base_image['width']}x{base_image['height']}.{image_ext}"
 
@@ -63,9 +75,30 @@ def extract_page_images(doc, page, output_dir, page_num):
 
                 filepath = os.path.abspath(os.path.join(images_dir, filename))
                 
-                # Save image to file
-                with open(filepath, 'wb') as img_file:
-                    img_file.write(image_bytes)
+                # Check if this image hash has been seen before
+                if image_hash in image_cache:
+                    # This is a duplicate - create symbolic link
+                    original_filepath = image_cache[image_hash]
+                    
+                    # Remove existing file if it exists (might be from previous run)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    
+                    # Create symbolic link
+                    try:
+                        os.symlink(original_filepath, filepath)
+                        print(f"Created symlink: {filepath} -> {original_filepath}")
+                    except OSError as e:
+                        print(f"Failed to create symlink {filepath} -> {original_filepath}: {e}")
+                        # Fallback: copy the file
+                        with open(filepath, 'wb') as img_file:
+                            img_file.write(image_bytes)
+                else:
+                    # New image - save it and cache the hash
+                    image_cache[image_hash] = filepath
+                    with open(filepath, 'wb') as img_file:
+                        img_file.write(image_bytes)
+                    print(f"Saved new image: {filepath}")
                 
                 # Record image info
                 extracted_images.append({
@@ -76,6 +109,8 @@ def extract_page_images(doc, page, output_dir, page_num):
                     "width": base_image.get("width"),
                     "height": base_image.get("height")
                 })
+                
+                print(f"Image processing time: {(time.time() - start_time) * 1000:.2f}ms")
                 
         except Exception as e:
             trace = traceback.format_exc()
@@ -109,6 +144,9 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
     reusable_buffer = BytesIO()
     doc = fitz.open(pdf_path)
     
+    # Initialize image cache for efficient duplicate detection across pages
+    image_cache = {}
+    
     try:
         if start_page == end_page:
             end_page += 1
@@ -118,7 +156,7 @@ async def pdf_to_images_and_text_impl(pdf_path, start_page, end_page, output_dir
             
             text = page.get_text()
             
-            extracted_images = extract_page_images(doc, page, output_dir, page_num)
+            extracted_images = extract_page_images(doc, page, output_dir, page_num, image_cache)
             img_array = None
             dimensions = None
             dpi = None
